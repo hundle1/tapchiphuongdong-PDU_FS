@@ -1,0 +1,58 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model TaiKhoanNguoiDung {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  magazines Magazine[]
+
+  @@map("users")
+}
+
+model Magazine {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  coverImage  String
+  publishDate DateTime
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String
+  major       String // 🔥 thêm trường Khoa/Ngành
+
+  // Relations
+  author TaiKhoanNguoiDung @relation(fields: [authorId], references: [id])
+  pages  Page[]
+
+  @@map("magazines")
+}
+
+model Page {
+  id         String   @id @default(uuid())
+  magazineId String
+  pageNumber Int
+  imageUrl   String
+  content    String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  magazine Magazine @relation(fields: [magazineId], references: [id], onDelete: Cascade)
+
+  @@unique([magazineId, pageNumber])
+  @@map("pages")
+}
