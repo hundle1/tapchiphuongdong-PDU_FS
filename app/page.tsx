@@ -9,10 +9,10 @@ import { Footer } from 'react-day-picker';
 async function getMagazines() {
   const magazines = await prisma.magazine.findMany({
     where: {
-      status: 'PUBLISHED'
+      trangThai: 'PUBLISHED'
     },
     orderBy: {
-      publishDate: 'desc'
+      createdAt: 'desc'
     },
     take: 8
   });
@@ -71,7 +71,17 @@ export default async function HomePage() {
             {magazines.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {magazines.map((magazine) => (
-                  <MagazineCard key={magazine.id} magazine={magazine} />
+                  <MagazineCard
+                    key={magazine.id}
+                    magazine={{
+                      id: magazine.id,
+                      title: magazine.tieuDe,
+                      description: magazine.moTa,
+                      coverImage: magazine.anhBia ?? '',
+                      publishDate: magazine.createdAt,
+                      status: magazine.trangThai,
+                    }}
+                  />
                 ))}
               </div>
             ) : (

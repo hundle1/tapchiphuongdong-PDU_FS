@@ -24,35 +24,36 @@ model TaiKhoanNguoiDung {
 }
 
 model Magazine {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  coverImage  String
-  publishDate DateTime
-  status      String   @default("DRAFT")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  authorId    String
-  major       String // 🔥 thêm trường Khoa/Ngành
-
-  // Relations
-  author TaiKhoanNguoiDung @relation(fields: [authorId], references: [id])
-  pages  Page[]
-
-  @@map("magazines")
+  id                  String             @id @default(cuid())
+  tieuDe              String
+  moTa                String?
+  anhBia              String?
+  fileUpload          File?              @relation(fields: [fileUploadId], references: [id])
+  fileUploadId        String?
+  soTrang             Int? // số trang PDF/Word
+  trangThai           String             @default("draft")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  TaiKhoanNguoiDung   TaiKhoanNguoiDung? @relation(fields: [taiKhoanNguoiDungId], references: [id])
+  taiKhoanNguoiDungId String?
+  Page                Page[]
 }
 
 model Page {
-  id         String   @id @default(uuid())
-  magazineId String
-  pageNumber Int
-  imageUrl   String
-  content    String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  soTrang   Int
+  imageUrl  String? // ảnh convert từ pdf/word
+  noiDung   String? // text OCR / trích xuất
+  magazine  Magazine @relation(fields: [tapChiId], references: [id])
+  createdAt DateTime @default(now())
+  tapChiId  String
+}
 
-  // Relations
-  magazine Magazine @relation(fields: [magazineId], references: [id], onDelete: Cascade)
-
-  @@unique([magazineId, pageNumber])
-  @@map("pages")
+model File {
+  id        String     @id @default(cuid())
+  fileName  String
+  fileType  String
+  fileUrl   String // link Supabase S3 hoặc local storage
+  createdAt DateTime   @default(now())
+  Magazine  Magazine[]
 }

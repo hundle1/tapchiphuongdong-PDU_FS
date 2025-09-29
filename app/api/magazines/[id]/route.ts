@@ -11,12 +11,12 @@ export async function GET(
         id: params.id,
       },
       include: {
-        pages: {
+        Page: {
           orderBy: {
-            pageNumber: 'asc'
+            soTrang: 'asc'
           }
         },
-        author: {
+        TaiKhoanNguoiDung: {
           select: {
             name: true,
             email: true
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     // Only return published magazines for public access
-    if (magazine.status !== 'PUBLISHED') {
+    if (magazine.trangThai !== 'PUBLISHED') {
       return NextResponse.json(
         { error: 'Magazine not available' },
         { status: 403 }

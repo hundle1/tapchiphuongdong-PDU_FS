@@ -2,38 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
+import { ArrowLeft, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-
-interface PageData {
-  pageNumber: number;
-  imageUrl: string;
-  content: string;
-}
 
 export default function AddNewMagazinePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    coverImage: '',
+    tieuDe: '',
+    moTa: '',
+    anhBia: '',
     publishDate: new Date().toISOString().split('T')[0],
-    status: 'DRAFT',
+    trangThai: 'draft',
   });
 
-  // luôn khởi tạo với 1 page (trang bìa)
-  const [pages, setPages] = useState<PageData[]>([
-    { pageNumber: 1, imageUrl: '', content: '' },
-  ]);
+
+  const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -46,91 +37,69 @@ export default function AddNewMagazinePage() {
         const userData = await response.json();
         setUser(userData);
       } else {
-        router.push('/admin/login');
+        router.push('/admin/login'); useState
       }
     } catch (error) {
       router.push('/admin/login');
     }
   };
 
-  const addPage = () => {
-    const newPage: PageData = {
-      pageNumber: pages.length + 1,
-      imageUrl: '',
-      content: '',
-    };
-    setPages([...pages, newPage]);
-  };
-
-  const removePage = (index: number) => {
-    // không cho xóa trang 1 (bìa)
-    if (index === 0) return;
-
-    const updatedPages = pages.filter((_, i) => i !== index);
-    // Renumber pages
-    const renumberedPages = updatedPages.map((page, i) => ({
-      ...page,
-      pageNumber: i + 1,
-    }));
-    setPages(renumberedPages);
-  };
-
-  const updatePage = (index: number, field: keyof PageData, value: string) => {
-    const updatedPages = pages.map((page, i) =>
-      i === index ? { ...page, [field]: value } : page
-    );
-    setPages(updatedPages);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title.trim()) {
+    if (!formData.tieuDe.trim()) {
       toast.error('Vui lòng nhập tiêu đề tạp chí');
       return;
     }
 
-    if (!formData.coverImage.trim()) {
+    if (!formData.anhBia.trim()) {
       toast.error('Vui lòng nhập URL ảnh bìa');
       return;
     }
 
-    // validate page 2+ phải có ảnh
-    const invalidPages = pages.filter(
-      (page, i) => i > 0 && !page.imageUrl.trim()
-    );
-    if (invalidPages.length > 0) {
-      toast.error('Vui lòng nhập URL hình ảnh cho tất cả các trang từ trang 2 trở đi');
+    if (!file) {
+      toast.error('Vui lòng upload file PDF hoặc Word');
       return;
     }
 
     setLoading(true);
 
     try {
-      // đồng bộ coverImage vào page 1
-      const finalPages = pages.map((page, i) =>
-        i === 0 ? { ...page, imageUrl: formData.coverImage } : page
-      );
+      const formDataToSend = new FormData();
+      formDataToSend.append('tieuDe', formData.tieuDe);
+      formDataToSend.append('moTa', formData.moTa);
+      formDataToSend.append('anhBia', formData.anhBia);
+      formDataToSend.append('publishDate', formData.publishDate);
+      formDataToSend.append('trangThai', formData.trangThai);
+      formDataToSend.append('file', file);
 
-      const response = await fetch('/api/admin/magazines', {
+
+      const response = await fetch('/api/admin/magazines/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          publishDate: new Date(formData.publishDate),
-          pages: finalPages,
-        }),
+        body: formDataToSend,
       });
 
       if (response.ok) {
         toast.success('Tạo tạp chí thành công');
         router.push('/admin/home');
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Có lỗi xảy ra khi tạo tạp chí');
+        let errorMessage = 'Có lỗi xảy ra khi tạo tạp chí';
+
+        try {
+          const error = await response.json();
+          if (error?.error) errorMessage = error.error;
+        } catch {
+          // body không phải JSON hoặc rỗng
+        }
+        toast.error(errorMessage);
       }
+
     } catch (error) {
       console.error('Error creating magazine:', error);
       toast.error('Có lỗi xảy ra khi tạo tạp chí');
@@ -186,9 +155,9 @@ export default function AddNewMagazinePage() {
                   <Label htmlFor="title">Tiêu đề tạp chí *</Label>
                   <Input
                     id="title"
-                    value={formData.title}
+                    value={formData.tieuDe}
                     onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
+                      setFormData({ ...formData, tieuDe: e.target.value })
                     }
                     placeholder="Nhập tiêu đề tạp chí"
                     required
@@ -211,12 +180,12 @@ export default function AddNewMagazinePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Mô tả</Label>
+                <Label htmlFor="moTa">Mô tả</Label>
                 <Textarea
-                  id="description"
-                  value={formData.description}
+                  id="moTa"
+                  value={formData.moTa}
                   onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
+                    setFormData({ ...formData, moTa: e.target.value })
                   }
                   placeholder="Nhập mô tả tạp chí"
                   rows={3}
@@ -224,12 +193,12 @@ export default function AddNewMagazinePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="coverImage">URL ảnh bìa *</Label>
+                <Label htmlFor="anhBia">URL ảnh bìa *</Label>
                 <Input
-                  id="coverImage"
-                  value={formData.coverImage}
+                  id="anhBia"
+                  value={formData.anhBia}
                   onChange={(e) =>
-                    setFormData({ ...formData, coverImage: e.target.value })
+                    setFormData({ ...formData, anhBia: e.target.value })
                   }
                   placeholder="https://example.com/cover-image.jpg"
                   required
@@ -237,11 +206,11 @@ export default function AddNewMagazinePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Trạng thái</Label>
+                <Label htmlFor="trangThai">Trạng thái</Label>
                 <Select
-                  value={formData.status}
+                  value={formData.trangThai}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, status: value })
+                    setFormData({ ...formData, trangThai: value })
                   }
                 >
                   <SelectTrigger>
@@ -256,72 +225,25 @@ export default function AddNewMagazinePage() {
             </CardContent>
           </Card>
 
-          {/* Pages Management */}
+          {/* File Upload */}
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Quản lý trang ({pages.length} trang)</CardTitle>
-                <Button type="button" onClick={addPage} variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Thêm trang
-                </Button>
-              </div>
+              <CardTitle>Tải lên file PDF/Word</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {pages.map((page, index) => (
-                  <div
-                    key={index}
-                    className="border rounded-lg p-4 bg-gray-50"
-                  >
-                    <div className="flex justify-between items-center mb-4">
-                      <Badge variant="outline">Trang {page.pageNumber}</Badge>
-                      {index > 0 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removePage(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {index === 0 ? (
-                      <div className="text-sm text-gray-600">
-                        Trang 1 sẽ luôn dùng ảnh bìa đã nhập:{" "}
-                        <span className="font-medium">
-                          {formData.coverImage || "(chưa có)"}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>URL hình ảnh *</Label>
-                          <Input
-                            value={page.imageUrl}
-                            onChange={(e) =>
-                              updatePage(index, "imageUrl", e.target.value)
-                            }
-                            placeholder="https://example.com/page-image.jpg"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Nội dung mô tả</Label>
-                          <Input
-                            value={page.content}
-                            onChange={(e) =>
-                              updatePage(index, "content", e.target.value)
-                            }
-                            placeholder="Mô tả nội dung trang này"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <Label>Chọn file *</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                  required
+                />
+                {file && (
+                  <p className="text-sm text-gray-600">
+                    File đã chọn: <span className="font-medium">{file.name}</span>
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

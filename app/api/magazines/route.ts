@@ -5,22 +5,25 @@ export async function GET() {
   try {
     const magazines = await prisma.magazine.findMany({
       where: {
-        status: 'PUBLISHED'
+        trangThai: 'PUBLISHED'
       },
       orderBy: {
-        publishDate: 'desc'
+        createdAt: 'desc'
       },
       include: {
-        author: {
+        TaiKhoanNguoiDung: {
           select: {
             name: true,
             email: true
           }
         },
-        pages: {
+        Page: {
           select: {
             id: true,
-            pageNumber: true
+            soTrang: true,
+            imageUrl: true,
+            noiDung: true,
+            createdAt: true
           }
         }
       }

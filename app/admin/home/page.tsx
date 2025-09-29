@@ -20,16 +20,17 @@ import {
 import { toast } from 'sonner';
 import Link from 'next/link';
 import FilterByKhoa from '@/components/FilterByKhoa';
+import Image from 'next/image';
 
 interface Magazine {
   id: string;
-  title: string;
-  description: string | null;
-  coverImage: string;
-  publishDate: Date;
-  status: string;
+  tieuDe: string;
+  moTa: string | null;
+  anhBia: string;
+  trangThai: string;
+  soTrang: number | null;
   createdAt: Date;
-  author: {
+  TaiKhoanNguoiDung: {
     name: string | null;
     email: string;
   };
@@ -110,7 +111,7 @@ export default function AdminHomePage() {
   const [selectedKhoa, setSelectedKhoa] = useState<string | null>(null)
 
   const filteredMagazines = magazines.filter((magazine) => {
-    const matchSearch = magazine.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchSearch = magazine.tieuDe.toLowerCase().includes(searchTerm.toLowerCase())
     const matchKhoa = selectedKhoa ? magazine.major === selectedKhoa : true
     return matchSearch && matchKhoa
   })
@@ -196,7 +197,7 @@ export default function AdminHomePage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {magazines.filter(m => m.status === 'PUBLISHED').length}
+                {magazines.filter(m => m.trangThai === 'PUBLISHED').length}
               </div>
             </CardContent>
           </Card>
@@ -208,7 +209,7 @@ export default function AdminHomePage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {magazines.filter(m => m.status === 'DRAFT').length}
+                {magazines.filter(m => m.trangThai === 'DRAFT').length}
               </div>
             </CardContent>
           </Card>
@@ -248,6 +249,7 @@ export default function AdminHomePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tiêu đề</TableHead>
+                    <TableHead>Ảnh bìa</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead>Số trang</TableHead>
                     <TableHead>Ngày xuất bản</TableHead>
@@ -259,18 +261,29 @@ export default function AdminHomePage() {
                   {filteredMagazines.map((magazine) => (
                     <TableRow key={magazine.id}>
                       <TableCell className="font-medium">
-                        {magazine.title}
+                        {magazine.tieuDe}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Image
+                          src={magazine.anhBia && magazine.anhBia.trim() !== ""
+                            ? magazine.anhBia
+                            : "/placeholder-magazine.jpg"}
+                          alt={magazine.tieuDe || "Magazine cover"}
+                          width={80}
+                          height={100}
+                          className="object-cover rounded-md"
+                          style={{ objectFit: 'cover', borderRadius: '0.375rem' }}
+                        />
                       </TableCell>
                       <TableCell>
-                        <Badge variant={magazine.status === 'PUBLISHED' ? 'default' : 'secondary'}>
-                          {magazine.status === 'PUBLISHED' ? 'Đã xuất bản' : 'Bản nháp'}
+                        <Badge variant={magazine.trangThai === 'PUBLISHED' ? 'default' : 'secondary'}>
+                          {magazine.trangThai === 'PUBLISHED' ? 'Đã xuất bản' : 'Bản nháp'}
                         </Badge>
                       </TableCell>
-                      <TableCell>{magazine.pages.length} trang</TableCell>
                       <TableCell>
-                        {format(new Date(magazine.publishDate), 'dd/MM/yyyy', { locale: vi })}
+                        {magazine.soTrang || magazine.pages.length}
                       </TableCell>
-                      <TableCell>{magazine.author.name || magazine.author.email}</TableCell>
+                      <TableCell>{magazine.TaiKhoanNguoiDung.name || magazine.TaiKhoanNguoiDung.email}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Button

@@ -11,11 +11,11 @@ import { Card, CardContent } from '@/components/ui/card';
 
 interface Magazine {
   id: string;
-  title: string;
-  description: string | null;
-  coverImage: string;
-  publishDate: Date;
-  status: string;
+  tieuDe: string;
+  moTa: string | null;
+  anhBia: string;
+  createdAt: Date;
+  trangThai: string;
 }
 
 function MagazineCardSkeleton() {
@@ -36,7 +36,7 @@ export default function MagazineListPage() {
   const [filteredMagazines, setFilteredMagazines] = useState<Magazine[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('publishDate');
+  const [sortBy, setSortBy] = useState('createdAt');
 
   useEffect(() => {
     fetchMagazines();
@@ -60,17 +60,17 @@ export default function MagazineListPage() {
 
   const filterMagazines = () => {
     let filtered = magazines.filter(magazine =>
-      magazine.status === 'PUBLISHED' &&
-      magazine.title.toLowerCase().includes(searchTerm.toLowerCase())
+      magazine.trangThai === 'PUBLISHED' &&
+      magazine.tieuDe.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Sort magazines
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'title':
-          return a.title.localeCompare(b.title);
-        case 'publishDate':
-          return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
+        case 'tieuDe':
+          return a.tieuDe.localeCompare(b.tieuDe);
+        case 'createdAt':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         default:
           return 0;
       }
@@ -82,7 +82,7 @@ export default function MagazineListPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
       <Navbar />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-orange-800 mb-2">
@@ -111,8 +111,8 @@ export default function MagazineListPage() {
                 <SelectValue placeholder="Sắp xếp theo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="publishDate">Ngày xuất bản</SelectItem>
-                <SelectItem value="title">Tiêu đề</SelectItem>
+                <SelectItem value="createdAt">Ngày xuất bản</SelectItem>
+                <SelectItem value="tieuDe">Tiêu đề</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -16,11 +16,11 @@ interface Page {
 
 interface Magazine {
   id: string;
-  title: string;
-  description: string | null;
-  coverImage: string;
-  publishDate: Date;
-  status: string;
+  tieuDe: string;
+  moTa: string | null;
+  anhBia: string;
+  createdAt: Date;
+  trangThai: string;
   pages: Page[];
 }
 
@@ -111,7 +111,7 @@ export default function MagazineDetailPage() {
         {magazine?.pages && magazine.pages.length > 0 ? (
           <MagazineReader
             pages={[...magazine.pages].sort((a, b) => a.pageNumber - b.pageNumber)}
-            title={magazine.title}
+            title={magazine.tieuDe}
           />
         ) : (
           <div className="flex items-center justify-center min-h-[400px] text-gray-500">
