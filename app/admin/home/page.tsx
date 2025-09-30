@@ -115,8 +115,6 @@ export default function AdminHomePage() {
     const matchKhoa = selectedKhoa ? magazine.major === selectedKhoa : true
     return matchSearch && matchKhoa
   })
-
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -124,9 +122,6 @@ export default function AdminHomePage() {
       </div>
     );
   }
-
-
-
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -154,9 +149,9 @@ export default function AdminHomePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push('/admin/addnew')}
+                  onClick={() => router.push('/admin/options')}
                 >
-                  Thêm mới
+                  Danh mục & Khoa
                 </Button>
                 {user?.role === 'SUPER_ADMIN' && (
                   <Button

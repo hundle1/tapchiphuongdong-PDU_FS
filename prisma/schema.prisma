@@ -26,27 +26,39 @@ model TaiKhoanNguoiDung {
 model Magazine {
   id                  String             @id @default(cuid())
   tieuDe              String
+  tenTacGia           String?
   moTa                String?
-  anhBia              String?
+  anhBiaLocal         String? // link local storage
+  anhBiaUrl           String? // link Url online
   fileUpload          File?              @relation(fields: [fileUploadId], references: [id])
   fileUploadId        String?
-  soTrang             Int? // số trang PDF/Word
+  soTrang             Int?
   trangThai           String             @default("draft")
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  ngayXuatBan         DateTime?
   TaiKhoanNguoiDung   TaiKhoanNguoiDung? @relation(fields: [taiKhoanNguoiDungId], references: [id])
   taiKhoanNguoiDungId String?
-  Page                Page[]
+  categoryName        Category[] // 👈 nhiều category
+  major               Major[]
+  readCount           Int                @default(0)
+  likeCount           Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 }
 
-model Page {
-  id        String   @id @default(cuid())
-  soTrang   Int
-  imageUrl  String? // ảnh convert từ pdf/word
-  noiDung   String? // text OCR / trích xuất
-  magazine  Magazine @relation(fields: [tapChiId], references: [id])
-  createdAt DateTime @default(now())
-  tapChiId  String
+model Major {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  magazines Magazine[] // 👈 nhiều magazine
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  magazines Magazine[] // 👈 nhiều magazine
 }
 
 model File {

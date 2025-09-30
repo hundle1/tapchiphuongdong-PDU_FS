@@ -6,9 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 async function checkAdminAuth() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-
+  const token = (await cookies()).get('admin_token')?.value;
   if (!token) return null;
 
   const decoded = verifyToken(token);
@@ -19,16 +17,105 @@ async function checkAdminAuth() {
     select: { id: true, role: true },
   });
 
-  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-    return null;
-  }
-
-  return user;
+  return user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? user : null;
 }
 
-// DELETE magazine
+// 🔍 GET chi tiết magazine
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await checkAdminAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Không có quyền truy cập' }, { status: 401 });
+    }
+
+    const magazine = await prisma.magazine.findUnique({
+      where: { id: params.id },
+      include: {
+        fileUpload: true,
+        categoryName: true,
+        TaiKhoanNguoiDung: { select: { name: true, email: true } },
+      },
+    });
+
+    if (!magazine) {
+      return NextResponse.json({ error: 'Không tìm thấy tạp chí' }, { status: 404 });
+    }
+
+    return NextResponse.json(magazine);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Lỗi khi lấy thông tin tạp chí' },
+      { status: 500 }
+    );
+  }
+}
+
+// 📝 PUT cập nhật magazine
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await checkAdminAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Không có quyền truy cập' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      tieuDe,
+      moTa,
+      anhBiaLocal,
+      anhBiaUrl,
+      trangThai,
+      soTrang,
+      tenTacGia,
+      ngayXuatBan,
+      categories, // array id category
+    } = body;
+
+    if (!tieuDe?.trim()) {
+      return NextResponse.json({ error: 'Thiếu tiêu đề' }, { status: 400 });
+    }
+
+    const magazine = await prisma.magazine.update({
+      where: { id: params.id },
+      data: {
+        tieuDe: tieuDe.trim(),
+        moTa: moTa?.trim() || null,
+        anhBiaLocal: anhBiaLocal?.trim() || null,
+        anhBiaUrl: anhBiaUrl?.trim() || null,
+        trangThai: trangThai || 'draft',
+        soTrang: soTrang ?? undefined,
+        tenTacGia: tenTacGia?.trim() || null,
+        ngayXuatBan: ngayXuatBan ? new Date(ngayXuatBan) : null,
+        updatedAt: new Date(),
+        categoryName: categories?.length
+          ? { set: categories.map((id: string) => ({ id })) }
+          : undefined,
+      },
+      include: {
+        fileUpload: true,
+        categoryName: true,
+        TaiKhoanNguoiDung: { select: { name: true, email: true } },
+      },
+    });
+
+    return NextResponse.json(magazine);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Cập nhật tạp chí thất bại' },
+      { status: 500 }
+    );
+  }
+}
+
+// 🗑 DELETE magazine
 export async function DELETE(
-  request: Request,
+  _req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -46,17 +133,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Không tìm thấy tạp chí' }, { status: 404 });
     }
 
-    // Xóa file vật lý nếu có
+    // Xóa file vật lý nếu tồn tại
     if (magazine.fileUpload?.fileUrl) {
       const filePath = path.join(process.cwd(), 'public', magazine.fileUpload.fileUrl);
       try {
         await fs.unlink(filePath);
-      } catch (err) {
-        console.warn('File không tồn tại hoặc đã xóa:', filePath);
+      } catch {
+        // file không tồn tại thì bỏ qua
       }
     }
 
-    // Xóa magazine và file record
+    // Xóa trong DB
     await prisma.magazine.delete({ where: { id: params.id } });
     if (magazine.fileUploadId) {
       await prisma.file.delete({ where: { id: magazine.fileUploadId } });
@@ -64,84 +151,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting magazine:', error);
-    return NextResponse.json({ error: 'Xóa tạp chí thất bại' }, { status: 500 });
-  }
-}
-
-// GET magazine detail
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const user = await checkAdminAuth();
-    if (!user) {
-      return NextResponse.json({ error: 'Không có quyền truy cập' }, { status: 401 });
-    }
-
-    const magazine = await prisma.magazine.findUnique({
-      where: { id: params.id },
-      include: {
-        Page: { orderBy: { soTrang: 'asc' } },
-        fileUpload: true,
-        TaiKhoanNguoiDung: { select: { name: true, email: true } },
-      },
-    });
-
-    if (!magazine) {
-      return NextResponse.json({ error: 'Không tìm thấy tạp chí' }, { status: 404 });
-    }
-
-    // Nếu soTrang = 0 thì fallback sang số lượng Page
-    const finalData = {
-      ...magazine,
-      soTrang: magazine.soTrang !== null ? magazine.soTrang : magazine.Page.length,
-    };
-
-    return NextResponse.json(finalData);
-  } catch (error) {
-    console.error('Error fetching magazine:', error);
-    return NextResponse.json({ error: 'Lỗi khi lấy thông tin tạp chí' }, { status: 500 });
-  }
-}
-
-// PUT update magazine
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const user = await checkAdminAuth();
-    if (!user) {
-      return NextResponse.json({ error: 'Không có quyền truy cập' }, { status: 401 });
-    }
-
-    const { tieuDe, moTa, anhBia, trangThai, soTrang } = await request.json();
-
-    if (!tieuDe || !anhBia) {
-      return NextResponse.json({ error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
-    }
-
-    const magazine = await prisma.magazine.update({
-      where: { id: params.id },
-      data: {
-        tieuDe,
-        moTa,
-        anhBia,
-        trangThai,
-        soTrang: soTrang ?? undefined, // cho phép update nếu có
-      },
-      include: {
-        Page: true,
-        fileUpload: true,
-        TaiKhoanNguoiDung: { select: { name: true, email: true } },
-      },
-    });
-
-    return NextResponse.json(magazine);
-  } catch (error) {
-    console.error('Error updating magazine:', error);
-    return NextResponse.json({ error: 'Cập nhật tạp chí thất bại' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Xóa tạp chí thất bại' },
+      { status: 500 }
+    );
   }
 }

@@ -8,9 +8,7 @@ import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 
 async function checkAdminAuth() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-
+  const token = (await cookies()).get('admin_token')?.value;
   if (!token) return null;
 
   const decoded = verifyToken(token);
@@ -21,37 +19,9 @@ async function checkAdminAuth() {
     select: { id: true, role: true },
   });
 
-  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-    return null;
-  }
-
-  return user;
+  return user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? user : null;
 }
 
-// 📌 GET danh sách tạp chí
-export async function GET() {
-  try {
-    const user = await checkAdminAuth();
-    if (!user) {
-      return NextResponse.json({ error: 'Không có quyền truy cập' }, { status: 401 });
-    }
-
-    const magazines = await prisma.magazine.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        TaiKhoanNguoiDung: { select: { name: true, email: true } },
-        fileUpload: true,
-      },
-    });
-
-    return NextResponse.json(magazines);
-  } catch (error) {
-    console.error('Error fetching magazines:', error);
-    return NextResponse.json({ error: 'Lỗi khi lấy danh sách tạp chí' }, { status: 500 });
-  }
-}
-
-// 📌 POST tạo tạp chí mới + upload file
 export async function POST(req: Request) {
   try {
     const user = await checkAdminAuth();
@@ -60,34 +30,52 @@ export async function POST(req: Request) {
     }
 
     const formData = await req.formData();
-    const tieuDe = formData.get('tieuDe') as string;
-    const moTa = formData.get('moTa') as string | null;
-    const trangThai = formData.get('trangThai') as string;
-    const anhBia = formData.get('anhBia') as string | null;
+    const tieuDe = (formData.get('tieuDe') as string)?.trim();
+    const tenTacGia = (formData.get('tenTacGia') as string)?.trim() || null;
+    const moTa = (formData.get('moTa') as string)?.trim() || null;
+    const anhBiaLocal = (formData.get('anhBiaLocal') as string)?.trim() || null;
+    const anhBiaUrl = (formData.get('anhBiaUrl') as string)?.trim() || null;
+    const ngayXuatBan = formData.get('ngayXuatBan') as string | null;
+    const trangThai = (formData.get('trangThai') as string) || 'draft';
+    const categories = formData.getAll('categories') as string[]; // nhiều category id
     const file = formData.get('file') as File | null;
 
-    if (!tieuDe || !file) {
-      return NextResponse.json({ error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
+    if (!tieuDe) {
+      return NextResponse.json({ error: 'Tiêu đề là bắt buộc' }, { status: 400 });
+    }
+    if (!file) {
+      return NextResponse.json({ error: 'File là bắt buộc' }, { status: 400 });
     }
 
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Chỉ hỗ trợ file PDF hoặc Word' }, { status: 400 });
+    }
+
+    // Đọc file buffer một lần
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
     const ext = path.extname(file.name).toLowerCase();
     let soTrang: number | null = null;
 
-    // Đọc file 1 lần
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    if (ext === '.pdf') {
-      const data = await pdf(buffer);
-      soTrang = data.numpages || 0;
-    } else if (ext === '.docx') {
-      const { value } = await mammoth.extractRawText({ arrayBuffer });
-      soTrang = value ? 1 : 0; // tạm gán 1 nếu có nội dung
-    } else {
-      return NextResponse.json({ error: 'Chỉ hỗ trợ PDF hoặc DOCX' }, { status: 400 });
+    try {
+      if (ext === '.pdf') {
+        const data = await pdf(buffer);
+        soTrang = data.numpages || 0;
+      } else {
+        const { value } = await mammoth.extractRawText({ arrayBuffer });
+        const wordCount = value.split(/\s+/).length;
+        soTrang = Math.max(1, Math.ceil(wordCount / 250));
+      }
+    } catch {
+      return NextResponse.json({ error: 'Lỗi khi xử lý file' }, { status: 400 });
     }
 
-    // 📂 Lưu file vào public/uploads/magazines/
+    // 📂 Lưu file
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'magazines');
     await fs.mkdir(uploadDir, { recursive: true });
 
@@ -97,35 +85,55 @@ export async function POST(req: Request) {
 
     const publicUrl = `/uploads/magazines/${fileName}`;
 
-    // 📌 Lưu record file
-    const fileRecord = await prisma.file.create({
-      data: {
-        fileName,
-        fileType: file.type,
-        fileUrl: publicUrl,
-      },
+    // 🗄️ Ghi database
+    const result = await prisma.$transaction(async (tx) => {
+      const fileRecord = await tx.file.create({
+        data: { fileName, fileType: file.type, fileUrl: publicUrl },
+      });
+
+      const magazine = await tx.magazine.create({
+        data: {
+          tieuDe,
+          tenTacGia,
+          moTa,
+          anhBiaLocal,
+          anhBiaUrl,
+          trangThai,
+          soTrang,
+          fileUploadId: fileRecord.id,
+          taiKhoanNguoiDungId: user.id,
+          ngayXuatBan: ngayXuatBan ? new Date(ngayXuatBan) : null,
+          categoryName: categories.length
+            ? {
+              connect: categories.map((id) => ({ id })),
+            }
+            : undefined,
+        },
+        include: {
+          fileUpload: true,
+          TaiKhoanNguoiDung: { select: { name: true, email: true } },
+          categoryName: true,
+        },
+      });
+
+      return magazine;
     });
 
-    // 📌 Lưu tạp chí
-    const magazine = await prisma.magazine.create({
-      data: {
-        tieuDe,
-        moTa,
-        anhBia: anhBia || null,
-        trangThai,
-        soTrang: soTrang ?? 0,
-        fileUploadId: fileRecord.id,
-        taiKhoanNguoiDungId: user.id,
-      },
-      include: {
-        fileUpload: true,
-        TaiKhoanNguoiDung: { select: { name: true, email: true } },
-      },
-    });
-
-    return NextResponse.json(magazine);
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error creating magazine:', error);
-    return NextResponse.json({ error: 'Lỗi khi tạo tạp chí' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Lỗi server khi tạo tạp chí',
+        details:
+          process.env.NODE_ENV === 'development' && error instanceof Error
+            ? error.message
+            : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
+
+
+
+
